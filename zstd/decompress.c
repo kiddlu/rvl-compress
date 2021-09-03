@@ -4,7 +4,7 @@
 #include <inttypes.h>
 #include <sys/stat.h>
 
-#include "lz4.h"
+#include "zstd.h"
 #include "header.h"
 
 unsigned int get_file_size(FILE *fp)
@@ -57,7 +57,7 @@ void print_header_info(struct depth_header *h)
     if(h == NULL){
         return;
         printf("header null\n");
-    } else if(h->magic_num != PACKAGE_HEADER_MAGIC_NUM) {
+    } else if(h->magic_num != HEADER_MAGIC_NUM) {
         printf("h->magic_num 0x%08x error\n", h->magic_num);
         return;
     }
@@ -96,8 +96,8 @@ int main(int argc, char* argv[])
     uint32_t olen = h->origin_size;
     char *output = malloc(olen);
 
-    if(h->content_format == PACKAGE_CONTENT_FORMAT_LZ4) {
-        LZ4_decompress_safe(ibuf, output, ilen, olen);
+    if(h->content_format == CONTENT_FORMAT_ZSTD) {
+        ZSTD_decompress(output, olen, ibuf, ilen);
     }
 
     printf("\n");

@@ -5,11 +5,12 @@
 #include <sys/stat.h>
 
 #include "lz4.h"
+#include "header.h"
 
 unsigned int get_file_size(FILE *fp)
 {
    unsigned int length;
-#if 0
+#if 1
     fseek(fp, 0L, SEEK_END);
     length = ftell(fp);
     fseek(fp, 0L, SEEK_SET);
@@ -51,6 +52,26 @@ void memdump(void *addr, uint32_t size)
     return;
 }
 
+void print_header_info(struct depth_header *h)
+{
+    if(h == NULL){
+        return;
+        printf("header null\n");
+    } else if(h->magic_num != PACKAGE_HEADER_MAGIC_NUM) {
+        printf("h->magic_num 0x%08x error\n", h->magic_num);
+        return;
+    }
+
+    printf("content_size: %d Bytes\n", h->content_size);
+    printf("origin_size : %d Bytes\n", h->origin_size);
+    
+    printf("content_format:  0x%02x\n", h->content_format);
+    printf("content_csum  :  0x%02x\n", h->content_csum);
+    printf("origin_csum   :  0x%02x\n", h->origin_csum);
+    printf("header_ver    :  0x%02x\n", h->header_ver);
+
+}
+
 
 int main(int argc, char* argv[])
 {
@@ -78,8 +99,19 @@ int main(int argc, char* argv[])
     uint32_t olen;
     char *output = malloc(len);
     olen = LZ4_compress_default(data, output, len, len);
-    
-    fp = fopen(argv[2], "wb+"); 
+
+	struct depth_header *header = malloc(PACKAGE_HEADER_SIZE);
+    header->magic_num =  PACKAGE_HEADER_MAGIC_NUM;
+    header->content_size = olen;
+    header->origin_size  = len;
+    header->content_format = PACKAGE_CONTENT_FORMAT_LZ4;
+    header->content_csum = header_csum(output, olen);
+    header->origin_csum  = header_csum(data, len);
+    header->header_ver = PACKAGE_HEADER_VERSION;
+    print_header_info(header);
+
+    fp = fopen(argv[2], "wb+");
+    fwrite(header, PACKAGE_HEADER_SIZE, 1, fp);
     fwrite(output, olen, 1, fp);
     fclose(fp);
 

@@ -4,7 +4,7 @@
 #include <inttypes.h>
 #include <sys/stat.h>
 
-#include "lz4.h"
+#include "zstd.h"
 #include "header.h"
 
 unsigned int get_file_size(FILE *fp)
@@ -57,7 +57,7 @@ void print_header_info(struct depth_header *h)
     if(h == NULL){
         return;
         printf("header null\n");
-    } else if(h->magic_num != PACKAGE_HEADER_MAGIC_NUM) {
+    } else if(h->magic_num != HEADER_MAGIC_NUM) {
         printf("h->magic_num 0x%08x error\n", h->magic_num);
         return;
     }
@@ -84,27 +84,34 @@ int main(int argc, char* argv[])
     }
 
     FILE *fp = fopen(argv[1], "rb");
+    uint32_t len = get_file_size(fp);
 
-	struct depth_header *h = malloc(PACKAGE_HEADER_SIZE);
-    fread(h, PACKAGE_HEADER_SIZE, 1, fp);
-    print_header_info(h);
- 
-    uint32_t ilen = h->content_size;
-    char *ibuf = malloc(ilen);
-    fread(ibuf, ilen, 1, fp);
- 
-    uint32_t olen = h->origin_size;
-    char *output = malloc(olen);
+    char *data = malloc(len);
+    fread(data, len, 1, fp);
 
-    if(h->content_format == PACKAGE_CONTENT_FORMAT_LZ4) {
-        LZ4_decompress_safe(ibuf, output, ilen, olen);
-    }
-
+#if 0
     printf("\n");
-    printf("Calc content_csum  :  0x%02x\n", header_csum(ibuf, ilen));
-    printf("Calc origin_csum   :  0x%02x\n", header_csum(output, olen));
+    printf("hexdump of file %s (%d bytes):\n", argv[1], len);
 
-    fp = fopen(argv[2], "wb+"); 
+    memdump(data, len);
+#endif
+
+    uint32_t olen;
+    char *output = malloc(len);
+    olen = ZSTD_compress(output, len, data, len, 1);
+
+	struct depth_header *header = malloc(PACKAGE_HEADER_SIZE);
+    header->magic_num =  HEADER_MAGIC_NUM;
+    header->content_size = olen;
+    header->origin_size  = len;
+    header->content_format = CONTENT_FORMAT_ZSTD;
+    header->content_csum = header_csum(output, olen);
+    header->origin_csum  = header_csum(data, len);
+    header->header_ver = HEADER_VERSION;
+    print_header_info(header);
+
+    fp = fopen(argv[2], "wb+");
+    fwrite(header, PACKAGE_HEADER_SIZE, 1, fp);
     fwrite(output, olen, 1, fp);
     fclose(fp);
 
