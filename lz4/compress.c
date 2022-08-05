@@ -98,7 +98,10 @@ int main(int argc, char* argv[])
 
     uint32_t olen;
     char *output = malloc(len);
+	
+	for(int i=0; i<1000; i++){
     olen = LZ4_compress_default(data, output, len, len);
+	}
 
 	struct depth_header *header = malloc(PACKAGE_HEADER_SIZE);
     header->magic_num =  PACKAGE_HEADER_MAGIC_NUM;

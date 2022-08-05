@@ -1,4 +1,4 @@
-all: compress decompress
+all: compress decompress mjpeg
 
 compress: compress.c lz4.c package.c
 	gcc -O2 -o $@ $^
@@ -6,5 +6,8 @@ compress: compress.c lz4.c package.c
 decompress: decompress.c lz4.c
 	gcc -O2 -o $@ $^
 
+mjpeg: mjpeg.c
+	gcc -O2 -o $@ $^
+
 clean:
-	rm compress decompress *.o out.*
+	rm compress decompress mjpeg *.o out.*

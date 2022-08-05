@@ -7,7 +7,6 @@
 #include "lz4.h"
 #include "package.h"
 
-
 uint32_t package_shrink(char *in, uint32_t ilen, char *out, uint32_t olen)
 {
 	if(in == NULL || out == NULL || ilen == 0) {
@@ -19,6 +18,13 @@ uint32_t package_shrink(char *in, uint32_t ilen, char *out, uint32_t olen)
 
     header->header_ver = PACKAGE_HEADER_VERSION;
     header->magic_num =  PACKAGE_DEPTH_IMAGE_MAGIC_NUM;
+#if 0
+    extern int os_time_get(uint32_t *tv_sec, uint32_t *tv_usec);
+    os_time_get(&(header->timestamp_sec), &(header->timestamp_usec));
+#else
+    header->timestamp_sec = 0;
+    header->timestamp_usec = 0;
+#endif
     header->origin_size  = ilen;
     header->origin_csum  = package_header_csum(in, ilen);
 
