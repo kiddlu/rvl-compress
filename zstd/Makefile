@@ -1,10 +1,10 @@
 all: compress decompress
 
-compress: compress.c
-	gcc -O2 -o $@ $^ -lzstd
+compress: compress.c zstd.c
+	gcc -O2 -o $@ $^
 
-decompress: decompress.c
-	gcc -O2 -o $@ $^ -lzstd
+decompress: decompress.c zstd.c
+	gcc -O2 -o $@ $^
 
 clean:
 	rm compress decompress *.o out.*
