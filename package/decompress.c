@@ -4,7 +4,9 @@
 #include <inttypes.h>
 #include <sys/stat.h>
 
+#include "rvl.h"
 #include "lz4.h"
+
 #include "package.h"
 
 unsigned int get_file_size(FILE *fp)
@@ -43,16 +45,19 @@ int main(int argc, char* argv[])
 	struct package_header *h = malloc(PACKAGE_HEADER_SIZE);
     ret = fread(h, PACKAGE_HEADER_SIZE, 1, fp);
     print_header_info(h);
- 
+
     uint32_t ilen = h->content_size;
     char *ibuf = malloc(ilen);
     ret = fread(ibuf, ilen, 1, fp);
- 
+
     uint32_t olen = h->origin_size;
     char *output = malloc(olen);
 
     if(h->content_format == PACKAGE_CONTENT_FORMAT_LZ4) {
         LZ4_decompress_safe(ibuf, output, ilen, olen);
+    }
+    else if(h->content_format == PACKAGE_CONTENT_FORMAT_RVL) {
+        rvl_decompress(ibuf, output, olen);
     }
 
     printf("\n");

@@ -5,11 +5,11 @@
 
 #define PACKAGE_HEADER_SIZE (128)
 
-#define PACKAGE_CONTENT_FORMAT_DATA     (0x01)
+#define PACKAGE_CONTENT_FORMAT_RAW      (0x01)
 #define PACKAGE_CONTENT_FORMAT_LZ4      (0x02)
-#define PACKAGE_CONTENT_FORMAT_ZSTD     (0x03)
+#define PACKAGE_CONTENT_FORMAT_RVL      (0x03)
 
-#define PACKAGE_HEADER_VERSION          (0x01)
+#define PACKAGE_HEADER_VERSION          (0x02)
 
 struct package_header
 {
