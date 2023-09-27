@@ -1,4 +1,4 @@
-all: compress decompress mjpeg
+all: compress decompress mjpeg benchmark
 
 compress: compress.c rvl.c lz4.c package.c
 	gcc -O2 -o $@ $^
@@ -6,8 +6,11 @@ compress: compress.c rvl.c lz4.c package.c
 decompress: decompress.c rvl.c lz4.c
 	gcc -O2 -o $@ $^
 
+benchmark: rvl.c lz4.c chronometer.c benchmark.c
+	gcc -O2 -o $@ $^
+
 mjpeg: mjpeg.c
 	gcc -O2 -o $@ $^
 
 clean:
-	rm compress decompress mjpeg *.o out.*
+	rm compress decompress mjpeg benchmark
