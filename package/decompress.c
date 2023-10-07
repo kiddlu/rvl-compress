@@ -4,8 +4,8 @@
 #include <inttypes.h>
 #include <sys/stat.h>
 
-#include "rvl.h"
-#include "lz4.h"
+#include "./algo/rvl.h"
+#include "./algo/lz4.h"
 
 #include "package.h"
 
@@ -57,7 +57,7 @@ int main(int argc, char* argv[])
         LZ4_decompress_safe(ibuf, output, ilen, olen);
     }
     else if(h->content_format == PACKAGE_CONTENT_FORMAT_RVL) {
-        rvl_decompress(ibuf, output, olen);
+        rvl_mt_decompress(ibuf, output, olen);
     }
 
     printf("\n");

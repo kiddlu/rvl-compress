@@ -4,8 +4,8 @@
 #include <inttypes.h>
 #include <sys/stat.h>
 
-#include "rvl.h"
-#include "lz4.h"
+#include "./algo/rvl.h"
+#include "./algo/lz4.h"
 
 #include "package.h"
 
@@ -35,7 +35,7 @@ uint32_t package_shrink(char *in, uint32_t ilen, char *out, uint32_t olen)
     header->content_size = LZ4_compress_default(in, content, ilen, olen - PACKAGE_HEADER_SIZE);
 #else
     header->content_format = PACKAGE_CONTENT_FORMAT_RVL;
-    header->content_size = rvl_compress(in, content, ilen);
+    header->content_size = rvl_mt_compress(in, content, ilen);
 #endif
 
     header->content_csum = package_header_csum(content, header->content_size);
