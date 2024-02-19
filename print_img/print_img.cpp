@@ -20,115 +20,7 @@
 #define STB_IMAGE_RESIZE_IMPLEMENTATION
 #include "stb/stb_image_resize.h"
 
-/*********************************/
-// Image Print
-/*********************************/
-typedef struct __attribute__((__packed__)) tagBITMAPFILEHEADER
-{
-    uint16_t bfType;
-    uint32_t bfSize;
-    uint16_t bfReserved1;
-    uint16_t bfReserved2;
-    uint32_t bfOffBits;
-} BITMAPFILEHEADER;
-
-typedef struct __attribute__((__packed__)) tagBITMAPINFOHEADER
-{
-    uint32_t biSize;
-    int32_t  biWidth;
-    int32_t  biHeight;
-    uint16_t biPlanes;
-    uint16_t biBitCount;
-    uint32_t biCompression;
-    uint32_t biSizeImage;
-    int32_t  biXPelsPerMeter;
-    int32_t  biYPelsPerMeter;
-    uint32_t biClrUsed;
-    uint32_t biClrImportant;
-} BITMAPINFOHEADER;
-
-int depth2bmp_hist(uint16_t *depth_img, uint8_t *bmp_img, int width, int height)
-{
-    int       histSize       = 9000;
-    uint16_t *depth_img_orig = depth_img;
-
-    for (int i = 0; i < width * height; ++i)
-    {
-        depth_img[i] = depth_img[i] >> 3;
-    }
-
-    unsigned int nPointsCount = 0;
-
-    float *histgram = (float *)malloc(histSize * sizeof(float));
-    memset(histgram, 0, histSize * sizeof(float));
-
-    for (int y = 0; y < height; ++y)
-    {
-        for (int x = 0; x < width; ++x, ++depth_img)
-        {
-            if (*depth_img != 0)
-            {
-                histgram[*depth_img]++;
-                nPointsCount++;
-            }
-        }
-    }
-
-    for (int nIndex = 1; nIndex < histSize; ++nIndex)
-    {
-        histgram[nIndex] += histgram[nIndex - 1];
-    }
-
-    if (nPointsCount)
-    {
-        for (int nIndex = 1; nIndex < histSize; ++nIndex)
-        {
-            histgram[nIndex] =
-                (256 * (1.0f - (histgram[nIndex] / nPointsCount)));
-        }
-    }
-
-    BITMAPFILEHEADER bmp_header;
-    BITMAPINFOHEADER bmp_hinfo;
-    bmp_header.bfType = 0x4D42;
-    bmp_header.bfSize =
-        (uint32_t)(sizeof(BITMAPFILEHEADER) + sizeof(BITMAPINFOHEADER) +
-                   width * height * 3);
-    bmp_header.bfReserved1 = 0;
-    bmp_header.bfReserved2 = 0;
-    bmp_header.bfOffBits =
-        (uint32_t)(sizeof(BITMAPFILEHEADER) + sizeof(BITMAPINFOHEADER));
-    bmp_hinfo.biSize          = sizeof(BITMAPINFOHEADER);
-    bmp_hinfo.biWidth         = width;
-    bmp_hinfo.biHeight        = height;
-    bmp_hinfo.biPlanes        = 1;
-    bmp_hinfo.biBitCount      = 24;
-    bmp_hinfo.biCompression   = 0;
-    bmp_hinfo.biSizeImage     = 4 * width * height;
-    bmp_hinfo.biXPelsPerMeter = 0;
-    bmp_hinfo.biYPelsPerMeter = 0;
-    bmp_hinfo.biClrUsed       = 0;
-    bmp_hinfo.biClrImportant  = 0;
-
-    memcpy(bmp_img, &bmp_header, sizeof(BITMAPFILEHEADER));
-    memcpy(bmp_img + sizeof(BITMAPFILEHEADER), &bmp_hinfo,
-           sizeof(BITMAPINFOHEADER));
-
-    uint8_t *bmp_img_body =
-        bmp_img + sizeof(BITMAPFILEHEADER) + sizeof(BITMAPINFOHEADER);
-
-    for (int i = 0, j = 0; i < width * height * 3; i += 3, j += 1)
-    {
-        *(bmp_img_body + i + 0) = 0;
-        *(bmp_img_body + i + 1) = histgram[depth_img_orig[j]];
-        *(bmp_img_body + i + 2) = histgram[depth_img_orig[j]];
-    }
-
-    free(histgram);
-
-    return (sizeof(BITMAPFILEHEADER) + sizeof(BITMAPINFOHEADER) +
-            width * height * 3);
-}
+//#define MULTI_THREAD_TRANSFORM
 
 #define TERM_PADDING_X 8
 #define TERM_PADDING_Y 4
@@ -198,7 +90,7 @@ static inline void get_ideal_image_size(int      *width,
     }
 }
 
-static inline int print_raw_img_compat(char        *img,
+static inline int print_raw_img_compat(unsigned char   *img,
                                        unsigned int width,
                                        unsigned int height)
 {
@@ -208,9 +100,9 @@ static inline int print_raw_img_compat(char        *img,
         unsigned char r;
         unsigned char g;
         unsigned char b;
-    } PixelData;
+    } pxdata_t;
 
-    PixelData *data = (PixelData *)img;
+    pxdata_t *data = (pxdata_t *)img;
     for (unsigned int d = 0; d < width * height; d++)
     {
         if (d % width == 0 && d != 0)
@@ -219,7 +111,7 @@ static inline int print_raw_img_compat(char        *img,
             printf("\n");
         }
 
-        PixelData *c = data + d;
+        pxdata_t *c = data + d;
         printf("\033[48;2;%03u;%03u;%03um ", c->r, c->g, c->b);
     }
     printf("\033[0m");
@@ -347,12 +239,12 @@ const unsigned int BITMAPS[] = {
     0, 1  // End marker for extended TELETEXT mode.
 };
 
-struct CharData
+typedef struct
 {
-    int fgColor[3];
-    int bgColor[3];
-    int codePoint;
-};
+    int fg_color[3];
+    int bg_color[3];
+    int codepoint;
+} chardata_t;
 
 #define cstd_max(a, b)          \
     ({                          \
@@ -380,9 +272,9 @@ static inline int cstd_bitcount(unsigned int n)
     return count;
 }
 
-// Return a CharData struct with the given code point and corresponding averag
+// Return a chardata struct with the given code point and corresponding averag
 // fg and bg colors.
-static inline struct CharData createCharData(unsigned char *image,
+static inline chardata_t create_chardata(unsigned char *image,
                                              int            x0,
                                              int            y0,
                                              int            width,
@@ -390,9 +282,9 @@ static inline struct CharData createCharData(unsigned char *image,
                                              int            codepoint,
                                              int            pattern)
 {
-    struct CharData result;
-    memset(&result, 0, sizeof(struct CharData));
-    result.codePoint         = codepoint;
+    chardata_t result;
+    memset(&result, 0, sizeof(chardata_t));
+    result.codepoint         = codepoint;
     int          fg_count    = 0;
     int          bg_count    = 0;
     unsigned int mask        = 0x80000000;
@@ -405,12 +297,12 @@ static inline struct CharData createCharData(unsigned char *image,
             int *avg;
             if (pattern & mask)
             {
-                avg = &(result.fgColor[0]);
+                avg = &(result.fg_color[0]);
                 fg_count++;
             }
             else
             {
-                avg = &(result.bgColor[0]);
+                avg = &(result.bg_color[0]);
                 bg_count++;
             }
             pixel_index = ((x0 + x) + width * (y0 + y)) * 3;
@@ -427,11 +319,11 @@ static inline struct CharData createCharData(unsigned char *image,
     {
         if (bg_count != 0)
         {
-            result.bgColor[i] /= bg_count;
+            result.bg_color[i] /= bg_count;
         }
         if (fg_count != 0)
         {
-            result.fgColor[i] /= fg_count;
+            result.fg_color[i] /= fg_count;
         }
     }
     return result;
@@ -439,7 +331,7 @@ static inline struct CharData createCharData(unsigned char *image,
 
 // Find the best character and colors for a 4x8 part of the image at the given
 // position
-static inline struct CharData findCharData(unsigned char *image,
+static inline chardata_t find_chardata(unsigned char *image,
                                            int            x0,
                                            int            y0,
                                            int            width,
@@ -602,7 +494,7 @@ static inline struct CharData findCharData(unsigned char *image,
 
     if (direct)
     {
-        struct CharData result;
+        chardata_t result;
         if (inverted)
         {
             long tmp          = max_count_color_1;
@@ -612,13 +504,13 @@ static inline struct CharData findCharData(unsigned char *image,
         for (int i = 0; i < 3; i++)
         {
             int shift         = 16 - 8 * i;
-            result.fgColor[i] = (max_count_color_2 >> shift) & 255;
-            result.bgColor[i] = (max_count_color_1 >> shift) & 255;
-            result.codePoint  = codepoint;
+            result.fg_color[i] = (max_count_color_2 >> shift) & 255;
+            result.bg_color[i] = (max_count_color_1 >> shift) & 255;
+            result.codepoint  = codepoint;
         }
         return result;
     }
-    return createCharData(image, x0, y0, width, height, codepoint,
+    return create_chardata(image, x0, y0, width, height, codepoint,
                           best_pattern);
 }
 
@@ -627,7 +519,7 @@ static inline int clamp_byte(int value)
     return value < 0 ? 0 : (value > 255 ? 255 : value);
 }
 
-static inline void emit_color(int is_bg, int r, int g, int b)
+static inline void print_term_color(int is_bg, int r, int g, int b)
 {
     r = clamp_byte(r);
     g = clamp_byte(g);
@@ -638,7 +530,7 @@ static inline void emit_color(int is_bg, int r, int g, int b)
     return;
 }
 
-static inline void emitCodepoint(int codepoint)
+static inline void print_codepoint(int codepoint)
 {
     if (codepoint < 128)
     {
@@ -668,18 +560,18 @@ static inline void emitCodepoint(int codepoint)
     }
 }
 
-static inline int trans_to_chardata(struct CharData *cha,
+static inline int trans_to_chardata(chardata_t *cha,
                                     unsigned char   *image,
                                     int              width,
                                     int              height)
 {
-    struct CharData *charData = cha;
+    chardata_t *cdata = cha;
     for (int y = 0; y < height; y = y + 8)
     {
         for (int x = 0; x < width; x = x + 4)
         {
-            *charData = findCharData(image, x, y, width, height);
-            charData++;
+            *cdata = find_chardata(image, x, y, width, height);
+            cdata++;
         }
     }
     return 0;
@@ -687,7 +579,7 @@ static inline int trans_to_chardata(struct CharData *cha,
 
 struct trans_thread_args
 {
-    struct CharData *ansi_char;
+    chardata_t *ansi_char;
     unsigned char   *image;
     int              width;
     int              height;
@@ -705,28 +597,28 @@ static inline int print_raw_img(unsigned char *image, int width, int height)
 {
     int char_width  = (width / 4);
     int char_height = (height / 8);
-    int char_length = char_width * char_height * sizeof(struct CharData);
+    int char_length = char_width * char_height * sizeof(chardata_t);
 
-    struct CharData *OriCharData  = (struct CharData *)malloc(char_length);
-    struct CharData *charData     = OriCharData;
-    struct CharData *lastCharData = OriCharData;
+    chardata_t *chardata_scheme  = (chardata_t *)malloc(char_length);
+    chardata_t *cur_chardata     = chardata_scheme;
+    chardata_t *last_chardata    = chardata_scheme;
 
 // trans
-#if 0
+#ifndef MULTI_THREAD_TRANSFORM
 #define THREAD_NUM (1)
-  for(int thread_id=0; thread_id < THREAD_NUM; thread_id++) {
-    trans_to_chardata(&charData[char_width * char_height / THREAD_NUM * thread_id], 
-	image + (width * height / THREAD_NUM * thread_id) * 3, width, height / THREAD_NUM);
-  }
+    for(int thread_id=0; thread_id < THREAD_NUM; thread_id++) {
+        trans_to_chardata(&cur_chardata[char_width * char_height / THREAD_NUM * thread_id], 
+	    image + (width * height / THREAD_NUM * thread_id) * 3, width, height / THREAD_NUM);
+    }
 #else
-#define THREAD_NUM (5)
+#define THREAD_NUM (4)
     pthread_t                thread_id[THREAD_NUM];
     struct trans_thread_args args[THREAD_NUM];
     int                      num;
     for (num = 0; num < THREAD_NUM; num++)
     {
         args[num].ansi_char =
-            &charData[char_width * char_height / THREAD_NUM * num];
+            &cur_chardata[char_width * char_height / THREAD_NUM * num];
         args[num].image  = image + (width * height / THREAD_NUM * num) * 3;
         args[num].width  = width;
         args[num].height = height / THREAD_NUM;
@@ -745,26 +637,27 @@ static inline int print_raw_img(unsigned char *image, int width, int height)
 #if 1
     for (int i = 0; i < (char_width * char_height);)
     {
-        if ((i % char_width) == 0 || charData->bgColor != lastCharData->bgColor)
-            emit_color(1, charData->bgColor[0], charData->bgColor[1],
-                       charData->bgColor[2]);
-        if ((i % char_width) == 0 || charData->fgColor != lastCharData->fgColor)
-            emit_color(0, charData->fgColor[0], charData->fgColor[1],
-                       charData->fgColor[2]);
-        emitCodepoint(charData->codePoint);
+        if ((i % char_width) == 0 || cur_chardata->bg_color != last_chardata->bg_color)
+            print_term_color(1, cur_chardata->bg_color[0], cur_chardata->bg_color[1],
+                       cur_chardata->bg_color[2]);
+        if ((i % char_width) == 0 || cur_chardata->fg_color != last_chardata->fg_color)
+            print_term_color(0, cur_chardata->fg_color[0], cur_chardata->fg_color[1],
+                       cur_chardata->fg_color[2]);
+        print_codepoint(cur_chardata->codepoint);
         i++;
         if ((i % char_width) == 0)
             printf("\x1b[0m\n");
 
-        lastCharData = charData;
-        charData++;
+        last_chardata = cur_chardata;
+        cur_chardata++;
     }
 #endif
-    free(OriCharData);
+
+    free(chardata_scheme);
     return 0;
 }
 
-int print_img(char        *img,
+int print_img(unsigned char *img,
               int          size,
               unsigned int opt_width,
               unsigned int opt_height,
@@ -772,7 +665,7 @@ int print_img(char        *img,
 {
     int            rwidth, rheight, rchannels;
     unsigned char *read_data = stbi_load_from_memory(
-        (const unsigned char *)img, size, &rwidth, &rheight, &rchannels, 3);
+        img, size, &rwidth, &rheight, &rchannels, 3);
 
     if (read_data == NULL)
     {
@@ -809,7 +702,7 @@ int print_img(char        *img,
     // desired_height);
 
     // Check for and do any needed image resizing...
-    char *data;
+    unsigned char *data;
     if (desired_width != (unsigned)rwidth ||
         desired_height != (unsigned)rheight)
     {
@@ -824,11 +717,11 @@ int print_img(char        *img,
             return -1;
         }
         stbi_image_free(read_data);
-        data = (char *)new_data;
+        data = new_data;
     }
     else
     {
-        data = (char *)read_data;
+        data = read_data;
     }
 
     if (compat == 1)
@@ -837,7 +730,7 @@ int print_img(char        *img,
     }
     else
     {
-        print_raw_img((unsigned char *)data, desired_width, desired_height);
+        print_raw_img(data, desired_width, desired_height);
     }
 
     stbi_image_free(data);

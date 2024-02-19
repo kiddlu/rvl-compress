@@ -21,32 +21,6 @@ void usage(void)
     printf("useage: exe in\n");
 }
 
-void memdump(void *addr, uint32_t size)
-{
-    int index;
-
-    while (size > 0) {
-        fprintf(stdout, "%p: ", addr);
-        index = 0;
-
-        // 32 bytes in the line
-        while (index < 32) {
-            fprintf(stdout, "%02x ", *((unsigned char *)addr));
-
-            index++;
-            addr++;
-            size--;
-
-            if (size <= 0)
-                break;
-        }
-        fprintf(stdout, "\n");
-    }
-    fprintf(stdout, "\n");
-    return;
-}
-
-
 int main(int argc, char* argv[])
 {
     if(argc != 2) {
@@ -62,17 +36,13 @@ int main(int argc, char* argv[])
 
     char *data = (char *)malloc(len);
     fread(data, len, 1, fp);
-#if 0
-    printf("\n");
-    printf("hexdump of file %s (%d bytes):\n", argv[1], len);
-
-    memdump(data, len);
-#endif
 
     uint32_t olen;
     char *output = (char *)malloc(len*2);
+	
+    print_img((unsigned char *)data, len, 0, 0, 0);
 
-    print_img(data, len, 0, 0, 0);
+    //print_img((unsigned char *)data, len, 0, 0, 1);
 
     return 0;
 }
