@@ -1,7 +1,7 @@
 all: main
 
-main: main.c print_img.c
-	gcc -o $@ $^ -L./ -lm
+main: main.cpp print_img.cpp
+	g++ -o $@ $^ -L./ -lm -lpthread
 
 clean:
 	rm main
